@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pouch</title>
+<meta name="description" content="Split your salary into pouches for spending and saving.">
+<meta name="theme-color" content="#1d3653">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pouch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* One phone-width column. Notebook palette: navy ink, green writing, pink amounts. Bottom tab bar: Home / Log / Setup. */
+:root{
+  --paper:#f6f8fb; --sheet:#ffffff; --rule:#d9e2ee; --ink:#1d3653; --ink-soft:#5a6f88;
+  --green:#2f7056; --green-soft:#e3f0ea; --pink:#c4697b; --pink-soft:#f8e6ea;
+  --warn:#b7791f; --warn-soft:#fbf0dc; --over:#b83a3a; --over-soft:#f9e1e1;
+  --hand:"Caveat","Segoe Print","Bradley Hand",cursive;
+  --body:"Figtree",-apple-system,system-ui,"Segoe UI",sans-serif;
+  --r:12px; color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#0f1722; --sheet:#16212f; --rule:#2a3a4f; --ink:#e4ecf6; --ink-soft:#9fb1c6;
+  --green:#6fc29d; --green-soft:#183328; --pink:#eb9aab; --pink-soft:#3a2129;
+  --warn:#e5b25d; --warn-soft:#3a2d16; --over:#f08a8a; --over-soft:#3d1d1d; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.tab{display:flex;flex-direction:column;gap:18px}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-top:calc(env(safe-area-inset-top,0px) + 14px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 96px);display:flex;flex-direction:column;gap:18px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2{font-family:var(--hand);font-weight:700;margin:0;text-wrap:balance}
+h1{font-size:2.3rem;line-height:1}
+h2{font-size:1.65rem;line-height:1.1}
+.label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);padding:16px}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+button{font:inherit;color:inherit;cursor:pointer}
+.icon-btn{background:var(--sheet);border:1px solid var(--rule);border-radius:999px;width:40px;height:40px;font-size:1.2rem;line-height:1}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--sheet);border-radius:10px;padding:10px 14px;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+.btn.danger{background:transparent;color:var(--over);border-color:var(--over)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+.monthbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.monthbar .m{font-weight:600}
+.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.summary div{display:flex;flex-direction:column;gap:2px}
+.summary b{font-size:1.12rem}
+form,.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--ink-soft);font-weight:500;min-width:0}
+input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:9px;padding:9px 10px;width:100%;min-width:0}
+.check{flex-direction:row;align-items:center;gap:8px}
+.check input{width:auto}
+.seg{display:flex;border:1px solid var(--rule);border-radius:9px;overflow:hidden}
+.seg button{flex:1;background:transparent;border:0;padding:9px;font-weight:600;color:var(--ink-soft)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--sheet)}
+.list{display:flex;flex-direction:column}
+.pouch{display:flex;flex-direction:column;gap:6px;padding-block:12px;border-top:1px solid var(--rule)}
+.pouch:first-child{border-top:0;padding-top:4px}
+.p-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.p-name{font-family:var(--hand);font-size:1.45rem;line-height:1;font-weight:700;overflow-wrap:anywhere}
+.amt{color:var(--pink);font-weight:700;white-space:nowrap}
+.plus{color:var(--green)}
+.bar{height:8px;border-radius:99px;background:var(--paper);border:1px solid var(--rule);overflow:hidden}
+.bar.big{height:14px}
+.bar i{display:block;height:100%;background:var(--green);border-radius:99px}
+.bar.warn i{background:var(--warn)} .bar.over i{background:var(--over)}
+.chip{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--green-soft);color:var(--green);white-space:nowrap}
+.chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.over{background:var(--over-soft);color:var(--over)}
+.row-sm{display:flex;justify-content:space-between;gap:10px;font-size:.82rem;color:var(--ink-soft);flex-wrap:wrap}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.entry{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding-block:9px;border-top:1px dashed var(--rule)}
+.entry:first-child{border-top:0}
+.entry .d{font-size:.78rem;color:var(--ink-soft);width:3.2em}
+.entry .what{min-width:0}
+.entry .what b{display:block;font-weight:600;font-size:.9rem}
+.entry .what span{display:block;font-size:.8rem;color:var(--ink-soft);overflow-wrap:anywhere}
+.del{background:transparent;border:1px solid transparent;border-radius:8px;color:var(--ink-soft);padding:4px 7px;font-size:.78rem}
+.del.armed{border-color:var(--over);color:var(--over);font-weight:600}
+.empty{padding:14px;border:1px dashed var(--rule);border-radius:10px;color:var(--ink-soft);font-size:.88rem}
+.note{font-size:.85rem;padding:10px 12px;border-radius:10px;background:var(--pink-soft);color:var(--ink);display:flex;gap:10px;justify-content:space-between;align-items:start}
+.note button{background:transparent;border:0;color:var(--ink-soft);font-size:1.1rem;line-height:1;padding:0 2px}
+.toast{font-size:.85rem;color:var(--green);font-weight:600;min-height:1.2em}
+.editor{display:flex;flex-direction:column;gap:12px}
+.ed{border:1px solid var(--rule);border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;background:var(--paper)}
+.ed input,.ed select{background:var(--sheet)}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--sheet);border-top:1px solid var(--rule);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+.tabs div{display:flex;max-width:560px;width:100%}
+.tabs button{flex:1;background:transparent;border:0;padding:12px 6px 10px;font-weight:600;color:var(--ink-soft);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.8rem}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-current=page]{color:var(--ink)}
+.tabs button[aria-current=page] svg{color:var(--pink)}
+@media (max-width:370px){.summary{grid-template-columns:1fr 1fr}.summary div:last-child{grid-column:1/-1}}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .4s ease}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="monthbar">
+    <button class="icon-btn" id="prev" aria-label="Previous month">‹</button>
+    <div style="text-align:center"><h1>Pouch</h1><div class="m" id="monthLabel"></div></div>
+    <button class="icon-btn" id="next" aria-label="Next month">›</button>
+  </div>
+
+  <div class="note" id="installHint" hidden><span>To add Pouch to your home screen, tap <b>Share</b> then <b>Add to Home Screen</b>.</span><button id="hideHint" aria-label="Hide tip">×</button></div>
+  <div class="note" id="starterNote" hidden><span>These are example pouches. Set your salary and your own pouches in <b>Setup</b>, or restore a backup there.</span></div>
+  <div class="note" id="storageNote" hidden><span>This browser isn't saving your data. Turn off Private Browsing, then reopen Pouch.</span></div>
+
+  <!-- HOME -->
+  <section id="tab-home" class="tab">
+    <div class="sheet summary num">
+      <div><span class="label">Salary</span><b id="sIncome">0</b></div>
+      <div><span class="label">Spent</span><b id="sSpent">0</b></div>
+      <div><span class="label">Left to spend</span><b id="sLeft">0</b></div>
+    </div>
+
+    <div class="sheet">
+      <div class="section-head"><h2>Log it</h2><span class="label">Same day</span></div>
+      <form id="addForm" autocomplete="off">
+        <div class="seg full" role="group" aria-label="Entry type">
+          <button type="button" id="kSpend" aria-pressed="true">Spent</button>
+          <button type="button" id="kAdd" aria-pressed="false">Added to savings</button>
+        </div>
+        <label>Amount<input id="fAmount" type="number" inputmode="decimal" min="0" step="any" placeholder="250" required></label>
+        <label>Pouch<select id="fPouch"></select></label>
+        <label class="full">What was it<input id="fNote" type="text" maxlength="80" placeholder="Uber to Nasr City"></label>
+        <label>Date<input id="fDate" type="date" required></label>
+        <div style="display:flex;align-items:end"><button class="btn" type="submit" style="width:100%">Add</button></div>
+        <div class="toast full" id="toast" aria-live="polite"></div>
+      </form>
+    </div>
+
+    <div class="sheet" id="spendBox">
+      <div class="section-head"><h2>Spending</h2><span class="label">Resets monthly</span></div>
+      <div class="list" id="spendList"></div>
+    </div>
+
+    <div class="sheet" id="saveBox">
+      <div class="section-head"><h2>Savings</h2><span class="label">Builds up</span></div>
+      <div class="actions" style="margin-bottom:10px">
+        <button class="btn" id="payday">Payday: fill savings</button>
+        <button class="btn ghost" id="closeMonth">Close month</button>
+      </div>
+      <div class="toast" id="saveToast" aria-live="polite"></div>
+      <div class="list" id="saveList"></div>
+    </div>
+
+    <div class="sheet" id="instBox">
+      <div class="section-head"><h2>Installments</h2><span class="label">Payments left</span></div>
+      <div class="toast" id="instToast" aria-live="polite"></div>
+      <div class="list" id="instList"></div>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section id="tab-log" class="tab" hidden>
+    <div class="sheet">
+      <div class="section-head"><h2>Entries</h2><span class="label num" id="entryCount"></span></div>
+      <div class="list" id="log"></div>
+    </div>
+  </section>
+
+  <!-- SETUP -->
+  <section id="tab-setup" class="tab" hidden>
+    <div class="sheet">
+      <div class="section-head"><h2>Salary</h2><span class="label">Per month</span></div>
+      <label>Monthly salary<input id="income" type="number" inputmode="decimal" min="0" step="any"></label>
+      <div class="row-sm num" style="margin-top:8px"><span id="allocLine"></span></div>
+    </div>
+
+    <div class="sheet">
+      <div class="section-head"><h2>Your pouches</h2><span class="label" id="pouchCount"></span></div>
+      <div class="editor" id="editor"></div>
+      <div class="actions" style="margin-top:12px"><button class="btn ghost" id="addPouch">+ Add pouch</button></div>
+    </div>
+
+    <div class="sheet">
+      <div class="section-head"><h2>Month-end rule</h2></div>
+      <label>Leftovers from ticked spending pouches go to<select id="sweepTo"></select></label>
+    </div>
+
+    <div class="sheet">
+      <div class="section-head"><h2>Backup</h2><span class="label">Keep in iCloud Drive</span></div>
+      <p style="margin:0 0 10px;font-size:.88rem;color:var(--ink-soft)">Your data lives only on this device. Download a backup every few weeks, and before switching phones.</p>
+      <div class="actions">
+        <button class="btn" id="backup">Download backup</button>
+        <label class="btn ghost" style="flex-direction:row;color:var(--ink);font-size:inherit;font-weight:600">Restore from file<input id="restore" type="file" accept="application/json,.json" hidden></label>
+      </div>
+      <div class="toast" id="backupToast" aria-live="polite"></div>
+      <div class="actions" style="margin-top:14px"><button class="btn danger" id="erase">Erase everything</button></div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="Sections"><div>
+  <button data-tab="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8l-2 3h-4z"/><path d="M10 7c-4 2-6 5-6 8a5 5 0 0 0 5 5h6a5 5 0 0 0 5-5c0-3-2-6-6-8"/></svg>Home</button>
+  <button data-tab="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>Log</button>
+  <button data-tab="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Setup</button>
+</div></nav>
+
+<script>
+"use strict";
+const KEY='pouch.v1';
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const now=new Date();
+const today=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+let month=today.slice(0,7);
+let kind='spend';
+
+function starter(){
+  const p=(name,type,budget,extra={})=>({id:uid(),name,type,budget,...extra});
+  const goal=p('Big goal','save',2500,{goal:30000});
+  return {version:1,starter:true,income:10000,sweepTo:goal.id,entries:[],pouches:[
+    p('Home','spend',3000,{sweep:false}),
+    p('Transport','spend',800,{sweep:true}),
+    p('Fun & gifts','spend',1000,{sweep:true}),
+    p('Buffer','spend',700,{sweep:true}),
+    goal,
+    p('Clothes','save',1000,{goal:0}),
+    p('Phone','install',1000,{payments:12,startPaid:0})
+  ]};
+}
+
+let storageOk=true;
+function load(){
+  try{const raw=localStorage.getItem(KEY);if(raw){const d=JSON.parse(raw);if(d&&Array.isArray(d.pouches))return normalize(d)}}catch(e){storageOk=false}
+  return starter();
+}
+function normalize(d){
+  return {version:1,starter:!!d.starter,income:Number(d.income)||0,sweepTo:d.sweepTo||'',
+    pouches:(d.pouches||[]).filter(p=>p&&p.id).map(p=>({id:String(p.id),name:String(p.name||'Pouch'),type:['spend','save','install'].includes(p.type)?p.type:'spend',budget:Number(p.budget)||0,goal:Number(p.goal)||0,sweep:!!p.sweep,payments:Number(p.payments)||0,startPaid:Number(p.startPaid)||0})),
+    entries:(d.entries||[]).filter(e=>e&&e.id&&e.date).map(e=>({id:String(e.id),date:String(e.date),month:String(e.date).slice(0,7),pouch:String(e.pouch),kind:['spend','add','allocate','sweep','payment'].includes(e.kind)?e.kind:'spend',amount:Number(e.amount)||0,note:String(e.note||''),ts:Number(e.ts)||0}))};
+}
+let S=load();
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(S));storageOk=true}catch(e){storageOk=false}
+  $('storageNote').hidden=storageOk;
+}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+
+const byId=id=>S.pouches.find(p=>p.id===id);
+const ofType=t=>S.pouches.filter(p=>p.type===t);
+function monthName(ym){const [y,m]=ym.split('-').map(Number);return new Date(y,m-1,1).toLocaleString('en-GB',{month:'long',year:'numeric'})}
+function shift(ym,d){const [y,m]=ym.split('-').map(Number);const t=new Date(y,m-1+d,1);return `${t.getFullYear()}-${pad(t.getMonth()+1)}`}
+function spentIn(pid,ym){return S.entries.filter(e=>e.pouch===pid&&e.month===ym&&(e.kind==='spend'||e.kind==='payment')).reduce((s,e)=>s+e.amount,0)}
+function balance(pid){return S.entries.filter(e=>e.pouch===pid).reduce((s,e)=>s+(e.kind==='spend'?-e.amount:e.kind==='payment'?0:e.amount),0)}
+function addedIn(pid,ym){return S.entries.filter(e=>e.pouch===pid&&e.month===ym&&(e.kind==='add'||e.kind==='allocate'||e.kind==='sweep')).reduce((s,e)=>s+e.amount,0)}
+function paidCount(p){return p.startPaid+S.entries.filter(e=>e.pouch===p.id&&e.kind==='payment').length}
+function level(used,cap){if(cap<=0)return used>0?'over':'ok';const r=used/cap;return r>1?'over':r>=.85?'warn':'ok'}
+function entryDate(){return month===today.slice(0,7)?today:month+'-01'}
+function addEntry(e){S.entries.push({id:uid(),ts:Date.now(),month:e.date.slice(0,7),note:'',...e});S.starter=false;save()}
+function toast(id,msg){$(id).textContent=msg;clearTimeout(toast[id]);toast[id]=setTimeout(()=>{$(id).textContent=''},3500)}
+function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n}
+
+/* ---------- HOME ---------- */
+function renderHome(){
+  $('monthLabel').textContent=monthName(month);
+  const spend=ofType('spend'),saves=ofType('save'),inst=ofType('install');
+  const spentAll=S.entries.filter(e=>e.month===month&&(e.kind==='spend'||e.kind==='payment')).reduce((s,e)=>s+e.amount,0);
+  const left=spend.reduce((s,p)=>s+Math.max(0,p.budget-spentIn(p.id,month)),0);
+  $('sIncome').textContent=fmt(S.income);$('sSpent').textContent=fmt(spentAll);$('sLeft').textContent=fmt(left);
+  $('starterNote').hidden=!S.starter;
+
+  const sl=$('spendList');sl.replaceChildren();$('spendBox').hidden=!spend.length;
+  spend.forEach(p=>{
+    const used=spentIn(p.id,month),rem=p.budget-used,lv=level(used,p.budget);
+    const box=el('div','pouch');const head=el('div','p-head');
+    head.append(el('div','p-name',p.name),el('span','chip '+(lv==='ok'?'':lv),rem>=0?fmt(rem)+' left':fmt(-rem)+' over'));
+    const bar=el('div','bar '+(lv==='ok'?'':lv));const i=el('i');i.style.width=(p.budget?Math.min(100,used/p.budget*100):0)+'%';bar.append(i);
+    const row=el('div','row-sm num');const a=el('span');a.append('Spent ',el('span','amt',fmt(used)));row.append(a,el('span','','of '+fmt(p.budget)+(p.sweep?' · leftovers move':'')));
+    box.append(head,bar,row);sl.append(box);
+  });
+
+  const vl=$('saveList');vl.replaceChildren();$('saveBox').hidden=!saves.length;
+  saves.forEach(p=>{
+    const bal=balance(p.id);const box=el('div','pouch');const head=el('div','p-head');
+    head.append(el('div','p-name',p.name),el('span','amt num',fmt(bal)));box.append(head);
+    if(p.goal>0){
+      const pct=Math.max(0,Math.min(100,bal/p.goal*100)),rem=Math.max(0,p.goal-bal),months=p.budget>0?Math.ceil(rem/p.budget):null;
+      const bar=el('div','bar big');const i=el('i');i.style.width=pct+'%';bar.append(i);
+      const row=el('div','row-sm num');row.append(el('span','',pct.toFixed(0)+'% of '+fmt(p.goal)),el('span','',rem===0?'Goal reached':months!==null?`~${months} month${months===1?'':'s'} to go`:'Set a monthly amount'));
+      box.append(bar,row);
+    }
+    const row2=el('div','row-sm num');row2.append(el('span','','Added this month: '+fmt(addedIn(p.id,month))),el('span','',fmt(p.budget)+'/month'));
+    box.append(row2);vl.append(box);
+  });
+  const filled=S.entries.some(e=>e.kind==='allocate'&&e.month===month);
+  const closed=S.entries.some(e=>e.kind==='sweep'&&e.month===month);
+  $('payday').disabled=filled;$('payday').textContent=filled?'Savings filled ✓':'Payday: fill savings';
+  const target=byId(S.sweepTo);
+  const early=month===today.slice(0,7)&&now.getDate()<25;
+  $('closeMonth').disabled=closed||!target||early;$('closeMonth').textContent=closed?'Month closed ✓':early?'Close month (from the 25th)':target?'Close month → '+target.name:'Close month';
+
+  const il=$('instList');il.replaceChildren();$('instBox').hidden=!inst.length;
+  inst.forEach(p=>{
+    const paid=Math.min(paidCount(p),p.payments||0),total=p.payments||0,leftN=Math.max(0,total-paid);
+    const box=el('div','pouch');const head=el('div','p-head');
+    head.append(el('div','p-name',p.name),el('span','chip '+(leftN===0?'':'warn'),leftN===0?'Paid off':leftN+' left'));
+    const bar=el('div','bar big');const i=el('i');i.style.width=(total?paid/total*100:0)+'%';bar.append(i);
+    const row=el('div','row-sm num');row.append(el('span','',`${paid} of ${total} paid`),el('span','',fmt(leftN*p.budget)+' still to pay'));
+    const doneThis=S.entries.some(e=>e.pouch===p.id&&e.kind==='payment'&&e.month===month);
+    const b=el('button','btn ghost',doneThis?'Paid this month ✓':leftN===0?'Finished':'Mark '+fmt(p.budget)+' paid');b.disabled=doneThis||leftN===0;
+    b.addEventListener('click',()=>{addEntry({date:entryDate(),pouch:p.id,kind:'payment',amount:p.budget,note:'Installment payment'});toast('instToast',p.name+': payment logged.');render()});
+    const act=el('div','actions');act.append(b);
+    box.append(head,bar,row,act);il.append(box);
+  });
+}
+
+/* ---------- ADD FORM ---------- */
+function fillPouchSelect(){
+  const sel=$('fPouch'),cur=sel.value;sel.replaceChildren();
+  S.pouches.filter(p=>kind==='spend'?p.type!=='install':p.type==='save').forEach(p=>{const o=el('option','',p.name);o.value=p.id;sel.append(o)});
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
+function setKind(k){kind=k;$('kSpend').setAttribute('aria-pressed',k==='spend');$('kAdd').setAttribute('aria-pressed',k==='add');fillPouchSelect()}
+$('kSpend').addEventListener('click',()=>setKind('spend'));
+$('kAdd').addEventListener('click',()=>setKind('add'));
+$('fDate').value=today;
+$('addForm').addEventListener('submit',ev=>{
+  ev.preventDefault();
+  const amount=Number($('fAmount').value),date=$('fDate').value,pouch=$('fPouch').value;
+  if(!(amount>0)||!date||!pouch){toast('toast','Enter an amount, a pouch and a date.');return}
+  addEntry({date,pouch,kind,amount,note:$('fNote').value.trim()});
+  $('fAmount').value='';$('fNote').value='';
+  toast('toast',`Logged ${fmt(amount)} ${kind==='spend'?'from':'to'} ${byId(pouch).name}.`);
+  if(date.slice(0,7)!==month)month=date.slice(0,7);
+  render();
+});
+
+$('payday').addEventListener('click',()=>{
+  const saves=ofType('save').filter(p=>p.budget>0);
+  if(!saves.length){toast('saveToast','Add a savings pouch with a monthly amount in Setup.');return}
+  saves.forEach(p=>addEntry({date:entryDate(),pouch:p.id,kind:'allocate',amount:p.budget,note:'Payday transfer'}));
+  toast('saveToast','Savings filled for '+monthName(month)+'.');render();
+});
+$('closeMonth').addEventListener('click',()=>{
+  const target=byId(S.sweepTo);if(!target)return;
+  const parts=ofType('spend').filter(p=>p.sweep).map(p=>({p,left:p.budget-spentIn(p.id,month)})).filter(x=>x.left>0);
+  const total=parts.reduce((s,x)=>s+x.left,0);
+  if(total<=0){toast('saveToast','No leftovers this month to move.');return}
+  addEntry({date:month===today.slice(0,7)?today:month+'-28',pouch:target.id,kind:'sweep',amount:total,note:'Leftovers from '+parts.map(x=>x.p.name).join(', ')});
+  toast('saveToast',`Moved ${fmt(total)} to ${target.name}.`);render();
+});
+
+/* ---------- LOG ---------- */
+const KIND_LABEL={spend:'',add:' · added',allocate:' · payday',sweep:' · leftovers',payment:' · installment'};
+function renderLog(){
+  const list=S.entries.filter(e=>e.month===month).sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts);
+  $('entryCount').textContent=list.length+(list.length===1?' entry':' entries');
+  const log=$('log');log.replaceChildren();
+  if(!list.length){log.append(el('div','empty',`Nothing logged for ${monthName(month)} yet. Add your first purchase on Home, the same day you spend it.`));return}
+  list.forEach(e=>{
+    const row=el('div','entry'),plus=e.kind==='add'||e.kind==='allocate'||e.kind==='sweep';
+    row.append(el('span','d num',e.date.slice(8)+'/'+e.date.slice(5,7)));
+    const w=el('div','what');w.append(el('b','',(byId(e.pouch)?.name||'Deleted pouch')+KIND_LABEL[e.kind]),el('span','',e.note));row.append(w);
+    row.append(el('span','amt num'+(plus?' plus':''),(plus?'+':'−')+fmt(e.amount)));
+    const del=el('button','del','Delete');del.setAttribute('aria-label','Delete entry');
+    del.addEventListener('click',()=>{
+      if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='Sure?';setTimeout(()=>{del.classList.remove('armed');del.textContent='Delete'},3000);return}
+      S.entries=S.entries.filter(x=>x.id!==e.id);save();render();
+    });
+    row.append(del);log.append(row);
+  });
+}
+
+/* ---------- SETUP ---------- */
+function field(labelText,input){const l=el('label','',labelText);l.append(input);return l}
+function numInput(val,onChange){const i=el('input');i.type='number';i.inputMode='decimal';i.min='0';i.step='any';i.value=val||'';i.addEventListener('change',()=>{onChange(Number(i.value)||0)});return i}
+function renderSetup(){
+  $('income').value=S.income||'';
+  const ed=$('editor');ed.replaceChildren();
+  $('pouchCount').textContent=S.pouches.length+' pouches';
+  S.pouches.forEach(p=>{
+    const box=el('div','ed');
+    const name=el('input');name.value=p.name;name.maxLength=30;name.addEventListener('change',()=>{p.name=name.value.trim()||'Pouch';commit()});
+    const type=el('select');[['spend','Spending (resets monthly)'],['save','Savings (builds up)'],['install','Installment']].forEach(([v,t])=>{const o=el('option','',t);o.value=v;type.append(o)});type.value=p.type;
+    type.addEventListener('change',()=>{p.type=type.value;if(p.type==='install'&&!p.payments)p.payments=6;commit()});
+    box.append(Object.assign(field('Name',name),{className:'full'}),Object.assign(field('Type',type),{className:'full'}));
+    box.append(field(p.type==='install'?'Monthly payment':'Monthly amount',numInput(p.budget,v=>{p.budget=v;commit()})));
+    if(p.type==='save')box.append(field('Goal (optional)',numInput(p.goal,v=>{p.goal=v;commit()})));
+    if(p.type==='install'){box.append(field('Total payments',numInput(p.payments,v=>{p.payments=Math.round(v);commit()})));box.append(field('Already paid',numInput(p.startPaid,v=>{p.startPaid=Math.round(v);commit()})))}
+    if(p.type==='spend'){const c=el('input');c.type='checkbox';c.checked=p.sweep;c.addEventListener('change',()=>{p.sweep=c.checked;commit()});const l=el('label','check');l.append(c,'Leftovers move at month end');box.append(l)}
+    const del=el('button','del','Delete pouch');del.style.justifySelf='end';del.classList.add('full');
+    del.addEventListener('click',()=>{
+      if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='Tap again to delete';setTimeout(()=>{del.classList.remove('armed');del.textContent='Delete pouch'},3000);return}
+      S.pouches=S.pouches.filter(x=>x.id!==p.id);if(S.sweepTo===p.id)S.sweepTo='';commit();
+    });
+    box.append(del);ed.append(box);
+  });
+  const st=$('sweepTo');st.replaceChildren();const none=el('option','','Choose a savings pouch');none.value='';st.append(none);
+  ofType('save').forEach(p=>{const o=el('option','',p.name);o.value=p.id;st.append(o)});st.value=byId(S.sweepTo)?S.sweepTo:'';
+  allocLine();
+}
+function allocLine(){
+  const tot=S.pouches.reduce((s,p)=>s+(p.budget||0),0),diff=S.income-tot;
+  $('allocLine').textContent=`Pouches total ${fmt(tot)} of ${fmt(S.income)} · `+(diff===0?'every pound has a job':diff>0?fmt(diff)+' not in a pouch yet':fmt(-diff)+' more than your salary');
+}
+function commit(){S.starter=false;save();render()}
+$('income').addEventListener('change',()=>{S.income=Number($('income').value)||0;commit()});
+$('addPouch').addEventListener('click',()=>{S.pouches.push({id:uid(),name:'New pouch',type:'spend',budget:0,goal:0,sweep:false,payments:0,startPaid:0});commit();const last=$('editor').lastElementChild;last&&last.querySelector('input').focus()});
+$('sweepTo').addEventListener('change',()=>{S.sweepTo=$('sweepTo').value;commit()});
+
+$('backup').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify({app:'Pouch',exported:new Date().toISOString(),...S},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pouch-backup-${today}.json`;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('backupToast','Backup ready. Save it to Files → iCloud Drive.');
+});
+$('restore').addEventListener('change',async ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  try{const d=JSON.parse(await f.text());if(!d||!Array.isArray(d.pouches))throw 0;S=normalize(d);S.starter=false;save();render();toast('backupToast',`Restored ${S.pouches.length} pouches and ${S.entries.length} entries.`)}
+  catch(e){toast('backupToast',"That file isn't a Pouch backup. Choose the .json file you downloaded.")}
+  ev.target.value='';
+});
+$('erase').addEventListener('click',function(){
+  if(!this.classList.contains('armed')){this.classList.add('armed');this.textContent='Tap again to erase all data';setTimeout(()=>{this.classList.remove('armed');this.textContent='Erase everything'},4000);return}
+  S=starter();save();render();toast('backupToast','Everything erased. Example pouches are back.');
+});
+
+/* ---------- NAV ---------- */
+let tab='home';
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  tab=b.dataset.tab;document.querySelectorAll('.tabs button').forEach(x=>x.toggleAttribute('aria-current',x===b));
+  document.querySelectorAll('.tabs button[aria-current]').forEach(x=>x.setAttribute('aria-current','page'));
+  document.querySelectorAll('.tab').forEach(s=>{const on=s.id==='tab-'+tab;s.hidden=!on});
+  window.scrollTo(0,0);render();
+}));
+$('prev').addEventListener('click',()=>{month=shift(month,-1);render()});
+$('next').addEventListener('click',()=>{month=shift(month,1);render()});
+
+function render(){renderHome();fillPouchSelect();if(tab==='log')renderLog();if(tab==='setup')renderSetup()}
+
+/* install tip: iPhone/iPad Safari, not yet on the home screen */
+(function(){
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const standalone=window.navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  let hidden=false;try{hidden=localStorage.getItem('pouch.hideHint')==='1'}catch(e){}
+  $('installHint').hidden=!(ios&&!standalone&&!hidden);
+  $('hideHint').addEventListener('click',()=>{$('installHint').hidden=true;try{localStorage.setItem('pouch.hideHint','1')}catch(e){}});
+})();
+
+try{if(!localStorage.getItem(KEY))save()}catch(e){storageOk=false;$('storageNote').hidden=false}
+render();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
