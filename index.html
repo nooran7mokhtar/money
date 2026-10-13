@@ -132,6 +132,10 @@ input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--paper
 .sw-custom input{position:absolute;inset:-6px;opacity:0;width:auto;height:auto;padding:0;border:0}
 .opt{display:flex;flex-direction:column;gap:8px}
 .opt+.opt{margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
+.shapes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.shapes button{background:var(--paper);border:1px solid var(--rule);border-radius:12px;padding:8px 4px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.78rem;font-weight:600;color:var(--ink-soft)}
+.shapes button svg{width:46px;overflow:visible}
+.shapes button[aria-pressed=true]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink);color:var(--ink)}
 .preview{display:flex;justify-content:center;gap:10px;margin-bottom:6px}
 .preview svg{width:86px;overflow:visible}
 
@@ -220,6 +224,11 @@ input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--paper
       <div class="section-head"><h2>Appearance</h2><span class="label">Make it yours</span></div>
       <div class="preview" id="preview"></div>
       <div class="opt">
+        <h3>Jar shape</h3>
+        <div class="shapes" id="shapeRow"></div>
+        <div class="row-sm">You can also give one jar a different shape under Your jars.</div>
+      </div>
+      <div class="opt">
         <h3>Jar colors</h3>
         <div class="seg" role="group" aria-label="Jar colors">
           <button type="button" id="cmSame">One color for all</button>
@@ -241,6 +250,10 @@ input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--paper
             <button type="button" data-hand="Kalam" style="font-family:Kalam,cursive">Marker</button>
             <button type="button" data-hand="Homemade Apple" style="font-family:'Homemade Apple',cursive;font-size:.8rem">Script</button>
           </div>
+          <div class="row-sm" style="margin:12px 0 6px">Label color</div>
+          <div id="labelColorRow"></div>
+          <div class="row-sm" style="margin:12px 0 6px">Writing color</div>
+          <div id="inkColorRow"></div>
         </div>
       </div>
       <div class="opt">
@@ -330,7 +343,10 @@ const today=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}
 let month=today.slice(0,7);
 let kind='spend';
 const PALETTE=['#5b74e6','#24356f','#1f9d8f','#3f9b5a','#7b5cd6','#e06c9f','#ee7a5a','#e3a21a','#3aa8e0','#7a8499'];
-const DEFAULT_LOOK={colorMode:'same',color:'#5b74e6',label:'paper',hand:'Caveat',coin:'gold'};
+const DEFAULT_LOOK={colorMode:'same',color:'#5b74e6',label:'paper',hand:'Caveat',coin:'gold',shape:'classic',paperColor:'#fffaf0',inkColor:'#2a2620'};
+const PAPER_COLORS=['#fffaf0','#ffffff','#e2c79b','#ffe9a8','#ffd9e2','#d9f2e3','#dbe9ff','#2f3338'];
+const INK_COLORS=['#2a2620','#0c1640','#6b3f1d','#b3261e','#1f6b45','#5a2ea6','#ffffff','#c99a2e'];
+const SHAPES=[['classic','Classic'],['round','Round'],['tall','Tall'],['cork','Cork']];
 
 function starter(){
   const p=(name,type,budget,extra={})=>({id:uid(),name,type,budget,goal:0,sweep:false,payments:0,startPaid:0,color:'',...extra});
@@ -359,8 +375,11 @@ function normalize(d){
   if(!['paper','plain'].includes(lk.label))lk.label='paper';
   if(!['Caveat','Kalam','Homemade Apple'].includes(lk.hand))lk.hand='Caveat';
   if(!['gold','silver','rose'].includes(lk.coin))lk.coin='gold';
+  if(!SHAPES.some(x=>x[0]===lk.shape))lk.shape='classic';
+  if(!isHex(lk.paperColor))lk.paperColor=DEFAULT_LOOK.paperColor;
+  if(!isHex(lk.inkColor))lk.inkColor=DEFAULT_LOOK.inkColor;
   return {version:1,starter:!!d.starter,income:Number(d.income)||0,sweepTo:d.sweepTo||'',look:lk,
-    pouches:(d.pouches||[]).filter(p=>p&&p.id).map(p=>({id:String(p.id),name:String(p.name||'Jar'),type:['spend','save','install'].includes(p.type)?p.type:'spend',budget:Number(p.budget)||0,goal:Number(p.goal)||0,sweep:!!p.sweep,payments:Number(p.payments)||0,startPaid:Number(p.startPaid)||0,color:isHex(p.color)?p.color:''})),
+    pouches:(d.pouches||[]).filter(p=>p&&p.id).map(p=>({id:String(p.id),name:String(p.name||'Jar'),type:['spend','save','install'].includes(p.type)?p.type:'spend',budget:Number(p.budget)||0,goal:Number(p.goal)||0,sweep:!!p.sweep,payments:Number(p.payments)||0,startPaid:Number(p.startPaid)||0,color:isHex(p.color)?p.color:'',shape:SHAPES.some(x=>x[0]===p.shape)?p.shape:''})),
     entries:(d.entries||[]).filter(e=>e&&e.id&&e.date).map(e=>({id:String(e.id),date:String(e.date),month:String(e.date).slice(0,7),pouch:String(e.pouch),kind:['spend','add','allocate','sweep','payment'].includes(e.kind)?e.kind:'spend',amount:Number(e.amount)||0,note:String(e.note||''),ts:Number(e.ts)||0,ext:!!e.ext}))};
 }
 let S=load();
@@ -402,7 +421,43 @@ const SVGNS='http://www.w3.org/2000/svg';
 let clipN=0, firstPaint=true;
 function seeded(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19}
   return function(){h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);h^=h>>>16;return (h>>>0)/4294967296}}
-const BODY="M60,58 C34,62 28,76 28,96 V212 C28,234 52,242 100,242 C148,242 172,234 172,212 V96 C172,76 166,62 140,58 Z";
+/* Jar shapes: body outline, glass neck, lid, where coins can reach, where the label sits */
+function screwLid(L,R,c,lidD,lidL,n){
+  const mid=(L+R)/2,rx=(R-L)/2,ticks=[];for(let x=L+8;x<R-4;x+=10)if(Math.abs(x-mid)>8)ticks.push(`M${x},23 V39`);
+  return `<ellipse cx="${mid}" cy="44" rx="${rx}" ry="5" fill="${lidD}"/>
+  <rect x="${L}" y="14" width="${R-L}" height="30" rx="5" fill="url(#gl${n})"/>
+  <ellipse cx="${mid}" cy="14" rx="${rx}" ry="6" fill="${lidL}"/>
+  <path d="${ticks.join(' ')}" stroke="${lidD}" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M${L+10},12 C${L+30},9 ${R-30},9 ${R-10},12" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>`;
+}
+const SHAPE={
+  classic:{body:"M60,58 C34,62 28,76 28,96 V212 C28,234 52,242 100,242 C148,242 172,234 172,212 V96 C172,76 166,62 140,58 Z",
+    neck:"M60,46 H140 V60 C140,60 122,64 100,64 C78,64 60,60 60,60 Z",top:84,labelY:150,labelW:110,
+    shine:["M42,100 C40,130 40,180 44,214","M158,112 C159,140 159,170 157,196","M60,58 C40,61 33,70 31,84"],
+    lid:(c,d,l,n)=>screwLid(50,150,c,d,l,n)},
+  round:{body:"M70,64 C34,72 20,110 20,152 C20,208 54,242 100,242 C146,242 180,208 180,152 C180,110 166,72 130,64 Z",
+    neck:"M70,48 H130 V66 C130,66 116,70 100,70 C84,70 70,66 70,66 Z",top:88,labelY:160,labelW:112,
+    shine:["M40,112 C30,140 32,180 48,208","M164,130 C168,150 167,172 160,190","M70,66 C52,70 40,80 34,94"],
+    lid:(c,d,l,n)=>`<ellipse cx="100" cy="50" rx="40" ry="6" fill="${d}"/>
+      <path d="M60,50 C60,30 80,26 100,26 C120,26 140,30 140,50 Z" fill="url(#gl${n})"/>
+      <path d="M72,36 C82,30 92,29 100,29" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="94" y="18" width="12" height="10" rx="3" fill="${d}"/>
+      <circle cx="100" cy="16" r="9" fill="url(#gl${n})"/><circle cx="97" cy="13" r="3" fill="#fff" opacity=".6"/>`},
+  tall:{body:"M62,58 C48,62 46,72 46,88 V222 C46,236 60,242 100,242 C140,242 154,236 154,222 V88 C154,72 152,62 138,58 Z",
+    neck:"M62,46 H138 V60 C138,60 120,63 100,63 C80,63 62,60 62,60 Z",top:80,labelY:152,labelW:92,
+    shine:["M58,98 C56,140 56,190 60,224","M142,110 C143,140 143,170 141,196","M62,58 C52,61 48,68 47,80"],
+    lid:(c,d,l,n)=>screwLid(56,144,c,d,l,n)},
+  cork:{body:"M78,72 C42,80 30,94 30,114 V212 C30,234 54,242 100,242 C146,242 170,234 170,212 V114 C170,94 158,80 122,72 Z",
+    neck:"M80,40 H120 V74 C120,74 110,77 100,77 C90,77 80,74 80,74 Z",top:100,labelY:164,labelW:108,
+    shine:["M44,116 C42,146 42,186 46,214","M156,124 C157,150 157,174 155,196","M80,74 C58,80 44,88 36,100"],
+    lid:(c,d,l,n)=>`<rect x="78" y="54" width="44" height="7" rx="2" fill="${c}"/>
+      <path d="M118,57 C128,60 132,70 128,80 M120,58 C124,66 122,74 116,80" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="100" cy="46" rx="22" ry="4" fill="#9a6c3c"/>
+      <rect x="78" y="16" width="44" height="30" rx="5" fill="url(#ck${n})"/>
+      <ellipse cx="100" cy="16" rx="22" ry="5" fill="#e9c896"/>
+      <g fill="#8a5d30" opacity=".45"><circle cx="88" cy="26" r="1.4"/><circle cx="104" cy="33" r="1.2"/><circle cx="113" cy="24" r="1.5"/><circle cx="95" cy="39" r="1.1"/><circle cx="110" cy="40" r="1.3"/></g>`}
+};
+function shapeOf(p){return SHAPE[(p&&p.shape)||S.look.shape]||SHAPE.classic}
 function labelLines(name){
   const words=String(name).split(/\s+/).filter(Boolean);
   if(name.length<=11||words.length<2)return [name];
@@ -411,13 +466,13 @@ function labelLines(name){
   return best;
 }
 /* jar(): color c, fill f (0..1), over-budget flag, animate coins, seed, name for the paper label */
-function jarSVG(c,f,over,animate,seedKey,name){
-  const n=++clipN, rnd=seeded(String(seedKey||'jar'));
+function jarSVG(c,f,over,animate,seedKey,name,shapeKey){
+  const n=++clipN, rnd=seeded(String(seedKey||'jar')), G=SHAPE[shapeKey]||SHAPE[S.look.shape]||SHAPE.classic, BODY=G.body;
   if(over)c='#d94848';
   const coinId='coin-'+S.look.coin;
   const rim={gold:'#d98200',silver:'#7f889b',rose:'#b8573d'}[S.look.coin];
   const ring={gold:'#fff6c4',silver:'#ffffff',rose:'#fff0e8'}[S.look.coin];
-  const ff=Math.max(0,Math.min(1,f)), bottom=238, topY=84, fillTop=bottom-ff*(bottom-topY);
+  const ff=Math.max(0,Math.min(1,f)), bottom=238, topY=G.top, fillTop=bottom-ff*(bottom-topY);
   const mound=Math.min(13,(bottom-fillTop)*0.2);
   const surface=x=>fillTop-mound*(1-Math.pow((x-100)/70,2))+(rnd()-.5)*3;
   let coins='',sparks='',count=0;
@@ -449,12 +504,12 @@ function jarSVG(c,f,over,animate,seedKey,name){
     const lines=labelLines(name), longest=Math.max(...lines.map(l=>l.length));
     const hand=S.look.hand, scale=hand==='Homemade Apple'?.72:hand==='Kalam'?.92:1.12;
     const fs=Math.max(12,Math.min(26,(170/Math.max(5,longest))*scale));
-    const h=lines.length>1?fs*2.25+10:fs*1.2+14, w=110, y0=150-h/2, rot=((rnd()-.5)*5).toFixed(1);
-    const txt=lines.map((l,i)=>`<text x="100" y="${(y0+(lines.length>1?(i+1)*fs*1.05+2:h/2+fs*.36)).toFixed(1)}" text-anchor="middle" font-family="'${hand}',cursive" font-size="${fs.toFixed(1)}" fill="#2a2620"${l.length>13?` textLength="${w-14}" lengthAdjust="spacingAndGlyphs"`:''}>${esc(l)}</text>`).join('');
-    label=`<g transform="rotate(${rot} 100 150)">
+    const h=lines.length>1?fs*2.25+10:fs*1.2+14, w=G.labelW, LY=G.labelY, y0=LY-h/2, rot=((rnd()-.5)*5).toFixed(1);
+    const txt=lines.map((l,i)=>`<text x="100" y="${(y0+(lines.length>1?(i+1)*fs*1.05+2:h/2+fs*.36)).toFixed(1)}" text-anchor="middle" font-family="'${hand}',cursive" font-size="${fs.toFixed(1)}" fill="${S.look.inkColor}"${l.length>13?` textLength="${w-14}" lengthAdjust="spacingAndGlyphs"`:''}>${esc(l)}</text>`).join('');
+    label=`<g transform="rotate(${rot} 100 ${LY})">
       <rect x="${100-w/2+2}" y="${y0+3}" width="${w}" height="${h}" rx="3" fill="#000" opacity=".18"/>
       <rect x="${100-w/2}" y="${y0}" width="${w}" height="${h}" rx="3" fill="url(#pp${n})"/>
-      <path d="M${100-w/2+6},${y0+h-6} H${100+w/2-6}" stroke="#d9cdb0" stroke-width="1" opacity=".7"/>
+      <path d="M${100-w/2+6},${y0+h-6} H${100+w/2-6}" stroke="${darken(S.look.paperColor,.15)}" stroke-width="1" opacity=".7"/>
       <rect x="${100-w/2-6}" y="${y0-5}" width="22" height="11" fill="#ffffff" opacity=".55" transform="rotate(-28 ${100-w/2+5} ${y0})"/>
       <rect x="${100+w/2-16}" y="${y0-5}" width="22" height="11" fill="#ffffff" opacity=".55" transform="rotate(28 ${100+w/2-5} ${y0})"/>
       ${txt}</g>`;
@@ -467,24 +522,20 @@ function jarSVG(c,f,over,animate,seedKey,name){
     <linearGradient id="gf${n}" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".14" stop-color="#fff" stop-opacity=".05"/><stop offset=".8" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="${darken(c,.3)}" stop-opacity=".35"/></linearGradient>
     <linearGradient id="gl${n}" x1="0" x2="1"><stop offset="0" stop-color="${lidD}"/><stop offset=".3" stop-color="${lidL}"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="${lidD}"/></linearGradient>
     <linearGradient id="gs${n}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".2" stop-color="#fff" stop-opacity=".85"/><stop offset=".8" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-    <linearGradient id="pp${n}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f3e9d2"/></linearGradient>
+    <linearGradient id="pp${n}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${lighten(S.look.paperColor,.25)}"/><stop offset="1" stop-color="${darken(S.look.paperColor,.06)}"/></linearGradient>
+    <linearGradient id="ck${n}" x1="0" x2="1"><stop offset="0" stop-color="#a87a47"/><stop offset=".35" stop-color="#e6c08e"/><stop offset="1" stop-color="#9c6d3d"/></linearGradient>
   </defs>
   <ellipse cx="100" cy="244" rx="70" ry="7" fill="#000" opacity=".16"/>
   <path d="${BODY}" fill="url(#gb${n})"/>
   <g clip-path="url(#cl${n})" class="${animate?'drop':''}">${coins}${sparks}</g>
   ${label}
   <path d="${BODY}" fill="url(#gf${n})"/>
-  <path d="M42,100 C40,130 40,180 44,214" fill="none" stroke="url(#gs${n})" stroke-width="7" stroke-linecap="round"/>
-  <path d="M158,112 C159,140 159,170 157,196" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/>
-  <path d="M60,58 C40,61 33,70 31,84" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>
+  <path d="${G.shine[0]}" fill="none" stroke="url(#gs${n})" stroke-width="7" stroke-linecap="round"/>
+  <path d="${G.shine[1]}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/>
+  <path d="${G.shine[2]}" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>
   <path d="${BODY}" fill="none" stroke="${edge}" stroke-opacity=".75" stroke-width="2.2"/>
-  <path d="M60,46 H140 V60 C140,60 122,64 100,64 C78,64 60,60 60,60 Z" fill="url(#gb${n})" stroke="${edge}" stroke-opacity=".75" stroke-width="2"/>
-  <rect x="50" y="14" width="100" height="30" rx="5" fill="url(#gl${n})"/>
-  <ellipse cx="100" cy="44" rx="50" ry="5" fill="${lidD}"/>
-  <rect x="50" y="14" width="100" height="30" rx="5" fill="url(#gl${n})"/>
-  <ellipse cx="100" cy="14" rx="50" ry="6" fill="${lighten(c,.45)}"/>
-  <path d="M58,22 V38 M68,22 V40 M78,23 V40 M88,23 V40 M112,23 V40 M122,23 V40 M132,22 V40 M142,22 V38" stroke="${lidD}" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round"/>
-  <path d="M60,12 C80,9 120,9 140,12" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
+  <path d="${G.neck}" fill="url(#gb${n})" stroke="${edge}" stroke-opacity=".75" stroke-width="2"/>
+  ${G.lid(c,lidD,lighten(c,.45),n)}
   </svg>`;
 }
 
@@ -509,12 +560,12 @@ function pouchState(p){
   return {f:total?paid/total:0,over:false,big:`${paid}/${total}`,sm:leftN?`paid · ${fmt(leftN*p.budget)} to go`:'paid off',
     tag:leftN===0?{cls:'',t:'Done'}:null,info:`${paid} of ${total} payments of ${fmt(p.budget)}`,leftN};
 }
-function jarFor(p,animate){const st=pouchState(p);return jarSVG(jarColor(p),st.f,st.over,animate,p.id,p.name)}
+function jarFor(p,animate){const st=pouchState(p);return jarSVG(jarColor(p),st.f,st.over,animate,p.id,p.name,p.shape)}
 function pouchCard(p){
   const st=pouchState(p);
   const b=el('button','pcard');b.type='button';
   b.setAttribute('aria-label',`${p.name}: ${st.big} ${st.sm}. Tap to log.`);
-  b.innerHTML=jarSVG(jarColor(p),st.f,st.over,firstPaint,p.id,p.name);
+  b.innerHTML=jarSVG(jarColor(p),st.f,st.over,firstPaint,p.id,p.name,p.shape);
   if(S.look.label!=='paper')b.append(el('span','nm',p.name));
   b.append(el('span','big '+(st.bigCls||''),st.big),el('span','sm',st.sm));
   if(st.tag)b.append(el('span','tag '+st.tag.cls,st.tag.t));
@@ -643,10 +694,11 @@ function renderLog(){
 /* ---------- SETUP ---------- */
 function field(labelText,input,cls){const l=el('label',cls||'',labelText);l.append(input);return l}
 function numInput(val,onChange){const i=el('input');i.type='number';i.inputMode='decimal';i.min='0';i.step='any';i.value=val||'';i.addEventListener('change',()=>{onChange(Number(i.value)||0)});return i}
-function swatchRow(current,onPick){
+function swatchRow(current,onPick,list){
+  list=list||PALETTE;
   const row=el('div','swatches');
-  PALETTE.forEach(c=>{const b=el('button','sw');b.type='button';b.style.background=c;b.setAttribute('aria-label','Color '+c);b.setAttribute('aria-pressed',current===c);b.addEventListener('click',()=>onPick(c));row.append(b)});
-  const cu=el('label','sw sw-custom');cu.setAttribute('aria-label','Custom color');cu.setAttribute('aria-pressed',!PALETTE.includes(current));
+  list.forEach(c=>{const b=el('button','sw');b.type='button';b.style.background=c;b.setAttribute('aria-label','Color '+c);b.setAttribute('aria-pressed',current===c);b.addEventListener('click',()=>onPick(c));row.append(b)});
+  const cu=el('label','sw sw-custom');cu.setAttribute('aria-label','Custom color');cu.setAttribute('aria-pressed',!list.includes(current));
   const ci=el('input');ci.type='color';ci.value=isHex(current)?current:'#5b74e6';ci.addEventListener('change',()=>onPick(ci.value));cu.append(ci);row.append(cu);
   return row;
 }
@@ -655,12 +707,18 @@ function renderLook(){
   $('cmSame').setAttribute('aria-pressed',L.colorMode==='same');$('cmEach').setAttribute('aria-pressed',L.colorMode==='each');
   $('allColorRow').hidden=L.colorMode!=='same';$('eachHint').hidden=L.colorMode!=='each';
   $('allColorRow').replaceChildren(swatchRow(L.color,c=>{L.color=c;commit()}));
+  $('labelColorRow').replaceChildren(swatchRow(L.paperColor,c=>{L.paperColor=c;commit()},PAPER_COLORS));
+  $('inkColorRow').replaceChildren(swatchRow(L.inkColor,c=>{L.inkColor=c;commit()},INK_COLORS));
+  const sr=$('shapeRow');sr.replaceChildren();
+  SHAPES.forEach(([k,t])=>{const b=el('button');b.type='button';b.setAttribute('aria-pressed',L.shape===k);
+    b.innerHTML=jarSVG(L.colorMode==='same'?L.color:PALETTE[0],.55,false,false,'shape-'+k,'',k);b.append(t);
+    b.addEventListener('click',()=>{L.shape=k;commit()});sr.append(b)});
   document.querySelectorAll('[data-label]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.label===L.label));
   document.querySelectorAll('[data-hand]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.hand===L.hand));
   document.querySelectorAll('[data-coin]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.coin===L.coin));
   $('handRow').hidden=L.label!=='paper';
   const sample=S.pouches.slice(0,3);
-  $('preview').innerHTML=(sample.length?sample:[{id:'x',name:'Savings',type:'save',budget:1,goal:2,color:''}]).map((p,i)=>jarSVG(jarColor(p),[.75,.45,.2][i]||.5,false,false,p.id,p.name)).join('');
+  $('preview').innerHTML=(sample.length?sample:[{id:'x',name:'Savings',type:'save',budget:1,goal:2,color:''}]).map((p,i)=>jarSVG(jarColor(p),[.75,.45,.2][i]||.5,false,false,p.id,p.name,p.shape)).join('');
 }
 $('cmSame').addEventListener('click',()=>{S.look.colorMode='same';commit()});
 $('cmEach').addEventListener('click',()=>{S.look.colorMode='each';commit()});
@@ -675,12 +733,14 @@ function renderSetup(){
   $('pouchCount').textContent=S.pouches.length+' jars';
   S.pouches.forEach(p=>{
     const box=el('div','ed');
-    const head=el('div','ed-head');const pic=el('div');pic.innerHTML=jarSVG(jarColor(p),.5,false,false,p.id,'');
+    const head=el('div','ed-head');const pic=el('div');pic.innerHTML=jarSVG(jarColor(p),.5,false,false,p.id,'',p.shape);
     const name=el('input');name.value=p.name;name.maxLength=30;name.addEventListener('change',()=>{p.name=name.value.trim()||'Jar';commit()});
     head.append(pic,field('Name',name));box.append(head);
     const type=el('select');[['spend','Spending (resets monthly)'],['save','Savings goal (builds up)'],['install','Installment']].forEach(([v,t])=>{const o=el('option','',t);o.value=v;type.append(o)});type.value=p.type;
     type.addEventListener('change',()=>{p.type=type.value;if(p.type==='install'&&!p.payments)p.payments=6;commit()});
     box.append(field('Type',type,'full'));
+    const sh=el('select');[['','Default shape'],...SHAPES].forEach(([v,t])=>{const o=el('option','',t);o.value=v;sh.append(o)});sh.value=p.shape||'';
+    sh.addEventListener('change',()=>{p.shape=sh.value;commit()});box.append(field('Jar shape',sh,'full'));
     box.append(field(p.type==='install'?'Monthly payment':'Monthly amount',numInput(p.budget,v=>{p.budget=v;commit()})));
     if(p.type==='save')box.append(field('Goal (optional)',numInput(p.goal,v=>{p.goal=v;commit()})));
     if(p.type==='install'){box.append(field('Total payments',numInput(p.payments,v=>{p.payments=Math.round(v);commit()})));box.append(field('Already paid',numInput(p.startPaid,v=>{p.startPaid=Math.round(v);commit()})))}
@@ -703,7 +763,7 @@ function allocLine(){
 }
 function commit(){S.starter=false;save();render()}
 $('income').addEventListener('change',()=>{S.income=Number($('income').value)||0;commit()});
-$('addPouch').addEventListener('click',()=>{S.pouches.push({id:uid(),name:'New jar',type:'spend',budget:0,goal:0,sweep:false,payments:0,startPaid:0,color:''});commit();const last=$('editor').lastElementChild;last&&last.querySelector('input').focus()});
+$('addPouch').addEventListener('click',()=>{S.pouches.push({id:uid(),name:'New jar',type:'spend',budget:0,goal:0,sweep:false,payments:0,startPaid:0,color:'',shape:''});commit();const last=$('editor').lastElementChild;last&&last.querySelector('input').focus()});
 $('sweepTo').addEventListener('change',()=>{S.sweepTo=$('sweepTo').value;commit()});
 
 $('backup').addEventListener('click',()=>{
