@@ -1,5 +1,5 @@
 // Pouch service worker: works offline, always tries for the newest page first.
-const CACHE = 'pouch-v3';
+const CACHE = 'pouch-v4';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './icon-maskable.png'];
 
 self.addEventListener('install', e => {
